@@ -1,0 +1,12 @@
+[package]
+name = "myboard"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+cortex-m = "0.7.6"
+cortex-m-rt = "0.7.6"
+embedded-hal = "1.0.0"
+panic-halt = "0.2.0"
+rp2040-boot2 = "0.3.0"
+rp2040-hal = { version = "0.12.0", features = ["critical-section-impl"] }
