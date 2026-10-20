@@ -1,14 +1,20 @@
 #![no_std]
 #![no_main]
 
+use crate::{button::BUTTON, mic::MICROPHONE};
 use embassy_executor::Spawner;
 use embassy_futures::select::select;
-use embassy_rp::gpio::{Input, Level, Output};
+use embassy_rp::{
+    bind_interrupts, dma,
+    gpio::{Input, Level, Output},
+    peripherals::{DMA_CH0, DMA_CH1},
+    spi::{Config, Spi},
+};
 use panic_halt as _;
 
-use crate::{button::BUTTON, mic::MICROPHONE};
-
 mod button;
+mod display;
+mod led;
 mod mic;
 
 #[embassy_executor::main(
@@ -16,25 +22,41 @@ mod mic;
     entry = "cortex_m_rt::entry"
 )]
 async fn main(_spawner: Spawner) -> ! {
-    // Grab our peripherals
     let peripherals = embassy_rp::init(Default::default());
 
-    // Configure GPIO15 as an output
-    let mut led_pin = Output::new(peripherals.PIN_15, Level::Low);
+    let led_pin = Output::new(peripherals.PIN_15, Level::Low);
     let button_pin = Input::new(peripherals.PIN_14, embassy_rp::gpio::Pull::Up);
     let mic_pin = Input::new(peripherals.PIN_13, embassy_rp::gpio::Pull::Down);
 
+    let cs = peripherals.PIN_17;
+    let clk = peripherals.PIN_18;
+    let mosi = peripherals.PIN_19;
+    let dc = peripherals.PIN_20;
+    let reset = peripherals.PIN_21;
+
+    let mut config = Config::default();
+    config.frequency = 40_000_000;
+    let spi = Spi::new_blocking_txonly(peripherals.SPI0, clk, mosi, config);
+
+    let cs = Output::new(cs, Level::Low);
+    let dc = Output::new(dc, Level::Low);
+    let reset = Output::new(reset, Level::Low);
+
     _spawner.spawn(button::button_task(button_pin).unwrap());
     _spawner.spawn(mic::microphone_task(mic_pin).unwrap());
+    _spawner.spawn(display::display_task(spi, cs, dc, reset).unwrap());
+    _spawner.spawn(led::led_task(led_pin).unwrap());
 
     let mut is_up = false;
     loop {
         if is_up {
             is_up = false;
-            led_pin.set_low();
+            led::LED.signal(led::LedEvent::Off);
+            display::DISPLAY.signal(display::DisplayEvent::Red);
         } else {
             is_up = true;
-            led_pin.set_high();
+            led::LED.signal(led::LedEvent::On);
+            display::DISPLAY.signal(display::DisplayEvent::Green);
         }
         select(BUTTON.wait(), MICROPHONE.wait()).await;
     }
