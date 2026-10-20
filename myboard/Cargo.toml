@@ -7,6 +7,7 @@ edition = "2024"
 cortex-m = "0.7.6"
 cortex-m-rt = "0.7.6"
 embassy-executor = "0.10.0"
+embassy-futures = "0.1.2"
 embassy-rp = { version = "0.10.0",  features = ["rp2040",  "time-driver", "critical-section-impl", "executor-thread", "executor-interrupt"] }
 embassy-sync = "0.8.0"
 embassy-time = "0.5.1"
