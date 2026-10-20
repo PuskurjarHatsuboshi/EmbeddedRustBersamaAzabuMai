@@ -1,4 +1,6 @@
 use core::cell::RefCell;
+use core::fmt::Write;
+use eg_seven_segment::SevenSegmentStyleBuilder;
 use embassy_embedded_hal::shared_bus::blocking::spi::SpiDevice;
 use embassy_rp::{
     gpio::Output,
@@ -8,8 +10,10 @@ use embassy_rp::{
 use embassy_sync::{
     blocking_mutex::Mutex, blocking_mutex::raw::CriticalSectionRawMutex, signal::Signal,
 };
-use embassy_time::Delay;
-use embedded_graphics::{image::Image, pixelcolor::Rgb565, prelude::*, primitives::Rectangle};
+use embassy_time::{Delay, Timer};
+use embedded_graphics::{
+    image::Image, pixelcolor::Rgb565, prelude::*, primitives::Rectangle, text::Text,
+};
 use mipidsi::{
     Builder,
     interface::SpiInterface,
@@ -17,11 +21,12 @@ use mipidsi::{
     options::{ColorOrder, Orientation, Rotation},
 };
 use tinybmp::Bmp;
+
+use crate::time::TIME;
 pub enum DisplayEvent {
     Red,
     Green,
 }
-pub static DISPLAY: Signal<CriticalSectionRawMutex, DisplayEvent> = Signal::new();
 
 #[embassy_executor::task]
 pub async fn display_task(
@@ -42,7 +47,7 @@ pub async fn display_task(
         .reset_pin(reset)
         .init(&mut delay)
         .unwrap(); // delay provider from your MCU
-    display.clear(Rgb565::WHITE);
+    display.clear(Rgb565::WHITE).unwrap();
 
     // Gambar diri sendiri :)
     let bmp_data = include_bytes!("./maimai.bmp");
@@ -50,23 +55,43 @@ pub async fn display_task(
     Image::new(&bmp, Point::new(0, 0))
         .draw(&mut display)
         .unwrap();
+    let mut hour_str = heapless::String::<8>::new();
+    let mut minute_str = heapless::String::<8>::new();
 
     loop {
-        let display_event = DISPLAY.wait().await;
-
-        match display_event {
-            DisplayEvent::Red => display
-                .fill_solid(
-                    &Rectangle::new(Point::new(213, 0), Size::new(107, 240)),
-                    Rgb565::RED,
-                )
-                .unwrap(),
-            DisplayEvent::Green => display
-                .fill_solid(
-                    &Rectangle::new(Point::new(213, 0), Size::new(107, 240)),
-                    Rgb565::GREEN,
-                )
-                .unwrap(),
+        if TIME.signaled() {
+            match TIME.wait().await {
+                crate::time::TimeEvent::Time { hour, minute } => {
+                    hour_str.clear();
+                    minute_str.clear();
+                    write!(&mut hour_str, "{:02}", hour).unwrap();
+                    write!(&mut minute_str, "{:02}", minute).unwrap();
+                }
+            }
         }
+
+        display
+            .fill_solid(
+                &Rectangle::new(Point::new(213, 35), Size::new(107, 150)),
+                Rgb565::WHITE,
+            )
+            .unwrap();
+        let segment_color = Rgb565::new(3, 51, 29); // #19ceef
+        let style = SevenSegmentStyleBuilder::new()
+            .digit_size(Size::new(30, 70)) // digits are 10x20 pixels
+            .digit_spacing(5) // 5px spacing between digits
+            .segment_width(5) // 5px wide segments
+            .segment_color(segment_color) // active segments are green
+            .build();
+
+        Text::new(&hour_str, Point::new(243, 105), style)
+            .draw(&mut display)
+            .unwrap();
+
+        Text::new(&minute_str, Point::new(243, 185), style)
+            .draw(&mut display)
+            .unwrap();
+
+        Timer::after_secs(1).await;
     }
 }
