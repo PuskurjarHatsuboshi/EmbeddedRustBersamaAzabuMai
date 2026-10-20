@@ -7,9 +7,7 @@ use embassy_rp::{
     peripherals::SPI0,
     spi::{Blocking, Spi},
 };
-use embassy_sync::{
-    blocking_mutex::Mutex, blocking_mutex::raw::CriticalSectionRawMutex, signal::Signal,
-};
+use embassy_sync::{blocking_mutex::Mutex, blocking_mutex::raw::CriticalSectionRawMutex};
 use embassy_time::{Delay, Timer};
 use embedded_graphics::{
     image::Image, pixelcolor::Rgb565, prelude::*, primitives::Rectangle, text::Text,
@@ -23,10 +21,6 @@ use mipidsi::{
 use tinybmp::Bmp;
 
 use crate::time::TIME;
-pub enum DisplayEvent {
-    Red,
-    Green,
-}
 
 #[embassy_executor::task]
 pub async fn display_task(

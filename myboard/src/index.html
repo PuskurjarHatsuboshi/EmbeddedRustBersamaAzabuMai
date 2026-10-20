@@ -1,0 +1,13 @@
+<button onclick="u()">Update time</button>
+<script>
+    function u() {
+        var n = new Date();
+        var y = n.getFullYear();
+        var m = ("0" + (n.getMonth() + 1)).slice(-2);
+        var d = ("0" + n.getDate()).slice(-2);
+        var h = ("0" + n.getHours()).slice(-2);
+        var i = ("0" + n.getMinutes()).slice(-2);
+        var s = ("0" + n.getSeconds()).slice(-2);
+        fetch("/api/time", { method: "POST", body: `${y}${m}${d}${h}${i}${s}` });
+    }
+</script>
